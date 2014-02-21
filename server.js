@@ -41,6 +41,19 @@ app.get('/main.js',function(req,res){
 	render.loadJs(res,data);
     })
 });
+app.post('/getTeams',function(req,res){
+    if(req.body.userId)
+    {
+	var userId=req.body.userId;
+	common.getTeam(userId,sqlConnect,null,function(teamName,id,num){
+	    common.getSquad(userId,sqlConnect,function(squad){
+		squad.push(teamName);
+		var jsonArray=JSON.stringify(squad);
+		res.end(jsonArray);
+	    });
+	});
+    }
+});
 app.get('/allTeams',function(req,res){
     var getAllTeams=sqlConnect.connection.query("SELECT * FROM `squads` WHERE `squad_status`=1",function(err,results){
 	if(err)
@@ -51,21 +64,21 @@ app.get('/allTeams',function(req,res){
 	if(results.length>0)
 	{
 	    var allTeams=new Array();
-	    var htmlResponse="<html><head><title>All Teams</title></head><body>";
+	    var htmlResponse="<html><head><title>All Teams</title><script type=\"text/javascript\" src=\"main.js\"></script></head><body>";
 	    var firstId=results[0].user_id;
-	    common.getTeam(firstId,sqlConnect,null,function(teamName,num){
-		htmlResponse+="<h1>Team "+teamName+"</h1><ul>";
+	    common.getTeam(firstId,sqlConnect,null,function(teamName,id,num){
+		htmlResponse+="<h1 id='teamName'>Team "+teamName+"</h1><div id='teamSquad'><ul>";
 		common.getSquad(firstId,sqlConnect,function(squad){
                     for(var j=0;j<squad.length;j++)
 			htmlResponse+="<li>"+squad[j]+"</li>";
-                    htmlResponse+="</ul>";
+                    htmlResponse+="</ul></div>";
 		    for(var i=0;i<results.length;i++)
 		    {
 			var userId=results[i].user_id;
-			common.getTeam(userId,sqlConnect,i,function(teamName,num){
+			common.getTeam(userId,sqlConnect,i,function(teamName,id,num){
 			    if(!isNaN(num))
 			    {
-				htmlResponse+="<button id="+num+">"+teamName+"</button>";
+				htmlResponse+="<button id="+id+" onclick=\"showSquad(this.id)\">"+teamName+"</button>";
 				if(num==results.length-1)
 				{
 				    htmlResponse+="</body></html>";
@@ -81,6 +94,7 @@ app.get('/allTeams',function(req,res){
     });
 });
 app.post('/profile',function(req,res){
+    console.log(req.body);
     if(req.body.loginName && req.body.loginPassword)
     {
 	var userName=req.body.loginName;
@@ -127,6 +141,5 @@ app.get('/profile',function(req,res){
     res.setHeader("Content-Type","text/plain");
     res.end("Not Found!");
 });
-
 app.listen(3000);
 console.log("Server running at port 3000");

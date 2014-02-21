@@ -45,7 +45,7 @@ var getTeam=function(userId,sqlConnection,num,callback)
 	}
 	if(results.length>0)
 	    teamName=results[0].squad_name;
-	callback(teamName,num);
+	callback(teamName,userId,num);
     });
 }
 exports.getSquad=getSquad;
