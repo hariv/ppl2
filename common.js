@@ -8,7 +8,7 @@ var getPlayerName=function(playerId,sqlConnection,num,callback)
 	    return;
 	}
 	if(results.length>0)
-	    callback(results[0].player_name,num);
+	    callback(results[0].player_name,playerId,num);
     });
 
 }
@@ -23,12 +23,14 @@ var getSquad=function(userId,sqlConnection,callback)
 	if(results.length>0)
 	{
 	    var squad=new Array();
+	    var squadId=new Array();
 	    for(var i=0;i<results.length;i++)
 	    {
-		getPlayerName(results[i].player_id,sqlConnection,i,function(name,num){
+		getPlayerName(results[i].player_id,sqlConnection,i,function(name,id,num){
 		    squad.push(name);
+		    squadId.push(id);
 		    if(num==results.length-1)
-			callback(squad);
+			callback(squad,squadId);
 		});
 	    }
 	}
