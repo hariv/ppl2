@@ -1,9 +1,29 @@
+var socket=io.connect("http://localhost");
+function startSocket()
+{
+    var matchList=document.getElementById("matchList");
+    var liNodes=matchList.childNodes;
+    if(liNodes.length!=11)
+    {
+	alert("Choose Exactly 11 Players");
+	return false;
+    }
+    var matchPlayers=new Array();
+    for(var i=0;i<liNodes.length;i++)
+	matchPlayers[i]=liNodes[i].id.replace("newPlayer","");
+    socket.emit('join',matchPlayers);
+    socket.on('joinError',function(data){
+	alert(data);
+    });
+    socket.on('joinResponse',function(data){
+	alert(data);
+    });
+}
 function removeFromTeam(id)
 {
     var newId=id.replace("newButton","");
     var squadList=document.getElementById("matchList");
     document.getElementById(newId).style.display="inline";
-    //console.log(document.getElementById(newId).style.display);
     var newLi=document.getElementById("newPlayer"+newId);
     newLi.parentNode.removeChild(newLi);
 }

@@ -3,15 +3,14 @@ var http=require('http');
 var express=require('express');
 var crypto=require('crypto');
 var mysql=require('mysql');
-var app=express.createServer();
-var io=require('socket.io').listen(app);
+var app=express();
+var server=http.createServer(app);
+var io=require('socket.io').listen(server);
 app.use(express.cookieParser());
 app.use(express.session({secret: '1234567890QWERTY'}));
 app.configure(function(){
     app.use(require('connect').bodyParser());
 });
-//var server=http.createServer(app);
-//var io=require('socket.io').listen(app);
 var config=require('./config.js');
 var error=require('./error.js');
 var render=require('./render.js');
@@ -78,7 +77,7 @@ app.post('/match',function(req,res){
 		var opponentId=results[0].team_1;
 		if(userId==opponentId)
 		    opponentId=results[0].team_2;
-		htmlResponse="<html><head><title>Match "+matchId+"</title><script type=\"text/javascript\" src=\"main.js\"></script></head><body>";
+		htmlResponse="<html><head><title>Match "+matchId+"</title><script src=\"/socket.io/socket.io.js\"></script><script type=\"text/javascript\" src=\"main.js\"></script></head><body><div id='hiddenDiv' style='display:none'>"+userId+"</div>";
 		htmlResponse+="<h3>My Team</h3><ul id=\"mySquad\">";
 		common.getSquad(userId,sqlConnect,function(squad,squadId){
 		    for(var i=0;i<squad.length;i++)
@@ -87,9 +86,46 @@ app.post('/match',function(req,res){
 		    common.getSquad(opponentId,sqlConnect,function(squad,squadId){
 			for(var j=0;j<squad.length;j++)
 			    htmlResponse+="<li>"+squad[j]+"</li>";
-			htmlResponse+="</ul><h3>Playing Eleven</h3><ul id=\"matchList\"></ul></body></html>";
+			htmlResponse+="</ul><h3>Playing Eleven</h3><ul id=\"matchList\"></ul><button id=\"startGame\" onclick=\"startSocket()\">Start!</button></body></html>";
 			res.setHeader('Content-Type','text/html');
 			res.end(htmlResponse);
+			io.sockets.on('connection',function(socket){
+			    socket.on('join',function(data){
+				if(io.sockets.clients("match"+matchId).length==2)
+                                    socket.emit('joinError','You cannot play this game');
+				else
+				{
+				    data.sort();
+				    var flag=0;
+				    for(var j=1;j<data.length;j++)
+					if(data[j]==data[j-1])
+					    flag=1;
+				    if(flag==1 || data.length!=11)
+					socket.emit('joinError','Choose 11 Distinct Players');
+				    else
+				    {
+					console.log("Starting Check");
+					common.checkAndUpdate(data,matchId,userId,sqlConnect,function(matchId,userId,status){
+					    if(status==0)
+						socket.emit('joinError','You can only have players from your team');
+					    else
+					    {
+						if(io.sockets.clients("match"+matchId).length==1)
+						{
+						    socket.join('match'+matchId);
+						    io.sockets.in('match'+matchId).emit('joinResponse',"Second");
+						}
+						else if(io.sockets.clients("match"+matchId).length==0)
+						{
+						    socket.join('match'+matchId);
+						    io.sockets.in('match'+matchId).emit('joinResponse',"First");
+						}
+					    }
+					});
+				    }
+				}
+			    });
+			});
 		    });
 		});
 	    }
@@ -211,5 +247,5 @@ app.post('/signout',function(req,res){
     res.setHeader('Content-Type','text/plain');
     res.end("Logged Out!");
 });
-app.listen(3000);
+server.listen(3000);
 console.log("Server running at port 3000");
