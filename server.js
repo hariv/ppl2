@@ -32,6 +32,14 @@ app.get('/',function(req,res){
 	});
     }
 });
+var adjacency=new Array(7);
+for(var i=0;i<7;i++)
+    adjacency[i]=new Array(8);
+for(var m=0;m<7;m++)
+{
+    for(var n=0;n<8;n++)
+	adjacency[m][n]=0;
+}
 app.get('/main.js',function(req,res){
     fs.readFile(__dirname+'/main.js',function(err,data){
 	if(err)
@@ -77,54 +85,25 @@ app.post('/match',function(req,res){
 		var opponentId=results[0].team_1;
 		if(userId==opponentId)
 		    opponentId=results[0].team_2;
-		htmlResponse="<html><head><title>Match "+matchId+"</title><script src=\"/socket.io/socket.io.js\"></script><script type=\"text/javascript\" src=\"main.js\"></script></head><body><div id='hiddenDiv' style='display:none'>"+userId+"</div>";
-		htmlResponse+="<h3>My Team</h3><ul id=\"mySquad\">";
-		common.getSquad(userId,sqlConnect,function(squad,squadId){
-		    for(var i=0;i<squad.length;i++)
-			htmlResponse+="<li id=oldPlayer"+squadId[i]+"><span id=player"+squadId[i]+">"+squad[i]+"</span><button id="+squadId[i]+" onclick=\"addToTeam(this.id)\">+</button>";
-		    htmlResponse+="</ul><h3>Opponent Squad</h3><ul id=\"opponentSquad\">";
-		    common.getSquad(opponentId,sqlConnect,function(squad,squadId){
-			for(var j=0;j<squad.length;j++)
-			    htmlResponse+="<li>"+squad[j]+"</li>";
-			htmlResponse+="</ul><h3>Playing Eleven</h3><ul id=\"matchList\"></ul><button id=\"startGame\" onclick=\"startSocket()\">Start!</button></body></html>";
-			res.setHeader('Content-Type','text/html');
-			res.end(htmlResponse);
-			io.sockets.on('connection',function(socket){
-			    socket.on('join',function(data){
-				if(io.sockets.clients("match"+matchId).length==2)
-                                    socket.emit('joinError','You cannot play this game');
-				else
-				{
-				    data.sort();
-				    var flag=0;
-				    for(var j=1;j<data.length;j++)
-					if(data[j]==data[j-1])
-					    flag=1;
-				    if(flag==1 || data.length!=11)
-					socket.emit('joinError','Choose 11 Distinct Players');
-				    else
-				    {
-					console.log("Starting Check");
-					common.checkAndUpdate(data,matchId,userId,sqlConnect,function(matchId,userId,status){
-					    if(status==0)
-						socket.emit('joinError','You can only have players from your team');
-					    else
-					    {
-						if(io.sockets.clients("match"+matchId).length==1)
-						{
-						    socket.join('match'+matchId);
-						    io.sockets.in('match'+matchId).emit('joinResponse',"Second");
-						}
-						else if(io.sockets.clients("match"+matchId).length==0)
-						{
-						    socket.join('match'+matchId);
-						    io.sockets.in('match'+matchId).emit('joinResponse',"First");
-						}
-					    }
-					});
-				    }
-				}
-			    });
+		var getSecretQuery=sqlConnect.connection.query("SELECT * FROM `team_sessions` WHERE `team_id`=?",[userId],function(err,results){
+		    if(err)
+		    {
+			error.sqlError("SELECT","team_sessions",err);
+			return;
+		    }
+		    var userSecret=results[0].team_password;
+		    htmlResponse="<html><head><title>Match "+matchId+"</title><script src=\"/socket.io/socket.io.js\"></script><script type=\"text/javascript\" src=\"main.js\"></script></head><body><div id=\"userId\" style=\"display:none;\">"+userId+"</div><div id=\"userSecret\" style=\"display:none;\">"+userSecret+"</div>";
+		    htmlResponse+="<h3>My Team</h3><ul id=\"mySquad\">";
+		    common.getSquad(userId,sqlConnect,function(squad,squadId){
+			for(var i=0;i<squad.length;i++)
+			    htmlResponse+="<li id=oldPlayer"+squadId[i]+"><span id=player"+squadId[i]+">"+squad[i]+"</span><button id="+squadId[i]+" onclick=\"addToTeam(this.id)\">+</button>";
+			htmlResponse+="</ul><h3>Opponent Squad</h3><ul id=\"opponentSquad\">";
+			common.getSquad(opponentId,sqlConnect,function(squad,squadId){
+			    for(var j=0;j<squad.length;j++)
+				htmlResponse+="<li>"+squad[j]+"</li>";
+			    htmlResponse+="</ul><h3>Playing Eleven</h3><ul id=\"matchList\"></ul><button id=\"startGame\" onclick=\"startSocket()\">Start!</button></body></html>";
+			    res.setHeader('Content-Type','text/html');
+			    res.end(htmlResponse);
 			});
 		    });
 		});
@@ -246,6 +225,57 @@ app.post('/signout',function(req,res){
 	req.session.userId=null;
     res.setHeader('Content-Type','text/plain');
     res.end("Logged Out!");
+});
+io.sockets.on('connection',function(socket){
+    socket.on('join',function(data){
+	var matchId=data.matchId;
+	var userId=data.userId;
+	var userSecret=data.userSecret;
+	var players=data.players;
+	players.sort();
+	var flag=0;
+	for(var j=1;j<data.length;j++)                                                                                     
+            if(data[j]==data[j-1])                                                                                         
+                flag=1;                                                                                                    
+        if(flag==1 || players.length!=11)                                                                                     
+            socket.emit('joinError','Choose 11 Distinct Players');
+	else
+	{
+	    common.authenticateUser(userId,userSecret,sqlConnect,function(result){
+		if(result)
+		{
+		    common.checkMatch(userId,matchId,sqlConnect,function(opponentId){
+			if(opponentId!=null)
+			{
+			    common.checkTeamPlayers(matchId,userId,players,sqlConnect,function(result){
+				console.log("Result is "+result);
+				if(result)
+				{
+				    if(io.sockets.clients("match"+matchId).length==0)
+				    {
+					socket.join('match'+matchId);
+					common.getPlayingEleven(userId,matchId,sqlConnect,function(team,teamId){
+					    socket.emit('joinResponse',team,teamId,"Waiting for Second Player...");
+					});
+				    }
+				    else if(io.sockets.clients("match"+matchId).length==1)
+				    {
+					socket.join('match'+matchId);
+					common.getPlayingEleven(userId,matchId,sqlConnect,function(team,teamId){
+					    common.getPlayingEleven(opponentId,matchId,sqlConnect,function(opTeam,opTeamId){
+						socket.emit('2JoinResponse',team,teamId,opTeam,opTeamId,"Waiting for Toss Results...");
+						socket.broadcast.to('match'+matchId).emit('tossStart',team,teamId);
+					    });
+					});                                                                                 
+				    }
+				}
+			    });
+			}
+		    });
+		}
+	    });
+	}
+    });
 });
 server.listen(3000);
 console.log("Server running at port 3000");

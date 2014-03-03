@@ -8,16 +8,68 @@ function startSocket()
 	alert("Choose Exactly 11 Players");
 	return false;
     }
+    var userId=document.getElementById("userId").innerHTML;
+    var userSecret=document.getElementById("userSecret").innerHTML;
+    var matchId=document.getElementsByTagName("title")[0].innerHTML;
+    matchId=matchId.replace("Match ","");
     var matchPlayers=new Array();
     for(var i=0;i<liNodes.length;i++)
 	matchPlayers[i]=liNodes[i].id.replace("newPlayer","");
-    socket.emit('join',matchPlayers);
+    var joinObject=new Object();
+    joinObject.userId=userId;
+    joinObject.userSecret=userSecret;
+    joinObject.matchId=matchId;
+    joinObject.players=matchPlayers;
+    socket.emit('join',joinObject);
     socket.on('joinError',function(data){
 	alert(data);
     });
-    socket.on('joinResponse',function(data){
-	alert(data);
+    socket.on('joinResponse',function(team,teamId,msg){
+	var body=document.getElementsByTagName("body")[0];
+	body.innerHTML="<h2>My Playing Eleven</h2><ul id='playingEleven'>";
+	for(var i=0;i<team.length;i++)
+	    body.innerHTML+="<li id="+teamId[i]+">"+team[i]+"</li>";
+	body.innerHTML+="</ul><br /><h3>"+msg+"</h3>";
     });
+    socket.on('tossStart',function(opTeam,opTeamId){
+	var msgHead=document.getElementsByTagName("h3")[0];
+	msgHead.parentNode.removeChild(msgHead);
+	var body=document.getElementsByTagName("body")[0];
+	body.innerHTML+="<h2>Opponent Eleven</h2><ul id='opponentEleven'>";
+	for(var i=0;i<opTeam.length;i++)
+	    body.innerHTML+="<li id="+opTeamId[i]+">"+opTeam[i]+"</li>";
+	body.innerHTML+="</ul>";
+	body.innerHTML+="<h3>Decide Toss</h3><div id='buttons'>";
+	body.innerHTML+="<button id='heads' onclick=\"toss(this.id)\">Heads</button>&nbsp;&nbsp;<button id=`tails` onclick=\"toss(this.id)\">Tails</button></div>"
+    });
+    socket.on('2JoinResponse',function(team,teamId,opTeam,opTeamId,msg){
+	var body=document.getElementsByTagName("body")[0];
+	body.innerHTML="<h2>My Playing Eleven</h2><ul id='playingEleven'>";
+	for(var i=0;i<team.length;i++)
+	    body.innerHTML+="<li id="+teamId[i]+">"+team[i]+"</li>";
+	body.innerHTML+="</ul><br /><h2>Opponent Eleven</h2><ul id='opponentEleven'>";
+	for(var j=0;j<opTeam.length;j++)
+	    body.innerHTML+="<li id="+opTeamId[j]+">"+opTeam[j]+"</li>";
+	body.innerHTML+="</ul><br /><h3>"+msg+"</h3>"
+    });
+}
+function toss(choice)
+{
+    var buttonDiv=document.getElementById("buttons");
+    buttonDiv.parentNode.removeChild(buttonDiv);
+    var chArray=new Array();
+    chArray['heads']=1;
+    chArray['tails']=2;
+    var userId=document.getElementById("userId").innerHTML;
+    var userSecret=document.getElementById("userSecret").innerHTML;
+    var matchId=document.getElementsByTagName("title")[0].innerHTML;
+    var tossObject=new Object();
+    tossObject.userId=userId;
+    tossObject.matchId=matchId;
+    tossObject.userSecret=userSecret;
+    tossObject.decision=chArray[choice];
+    socket.emit('toss',tossObject);
+    
 }
 function removeFromTeam(id)
 {
