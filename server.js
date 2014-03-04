@@ -227,7 +227,37 @@ app.post('/signout',function(req,res){
     res.end("Logged Out!");
 });
 io.sockets.on('connection',function(socket){
+    socket.on('toss',function(data){
+	var matchId=data.matchId;
+        var userId=data.userId;
+        var userSecret=data.userSecret;
+	common.authenticateUser(userId,userSecret,sqlConnect,function(result){
+            if(result)
+	    {
+		common.checkMatch(userId,matchId,sqlConnect,function(opponentId){
+		    console.log(opponentId);
+		    if(opponentId!=null)
+		    {
+			var toss=Math.random();
+			console.log(toss);
+			if(toss>1)
+			{
+			    socket.emit('tossSuccess',userId);
+			    socket.broadcast.to('match'+matchId).emit('tossFailure',userId);
+			}
+			else
+			{
+			    socket.emit('tossFailure',userId);
+			    socket.broadcast.to('match'+matchId).emit('tossSuccess',userId);
+			}
+			
+		    }
+		});
+	    }
+	});
+    });
     socket.on('join',function(data){
+	console.log(data);
 	var matchId=data.matchId;
 	var userId=data.userId;
 	var userSecret=data.userSecret;
@@ -248,7 +278,6 @@ io.sockets.on('connection',function(socket){
 			if(opponentId!=null)
 			{
 			    common.checkTeamPlayers(matchId,userId,players,sqlConnect,function(result){
-				console.log("Result is "+result);
 				if(result)
 				{
 				    if(io.sockets.clients("match"+matchId).length==0)

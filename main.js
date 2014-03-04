@@ -1,4 +1,42 @@
 var socket=io.connect("http://localhost");
+socket.on('tossSuccess',function(data){
+    var userId=document.getElementById("userId").innerHTML;
+    var userSecret=document.getElementById("userSecret").innerHTML;
+    var matchId=document.getElementsByTagName("title")[0].innerHTML;
+    var body=document.getElementsByTagName("body")[0];
+    matchId=matchId.replace("Match ","");
+    if(data==userId)
+    {
+	var tossDiv=document.getElementById("tossDiv");
+	tossDiv.parentNode.removeChild(tossDiv);
+    }
+    else
+    {
+	var status=document.getElementById("status");
+	status.parentNode.removeChild(status);
+    }
+    body.innerHTML+="<br />You have Won the Toss";
+    body.innerHTML+="<br /><h3 id='startDecision'>What do you Choose</h3><div id='buttons'><button id='bat' onclick=\"choice(this.id)\">Batting</button>&nbsp;&nbsp;<button id=`bowl` onclick=\"choice(this.id)\">Bowling</button></div>"
+});
+socket.on('tossFailure',function(data){
+    console.log("You Lost!");
+    var userId=document.getElementById("userId").innerHTML;
+    var userSecret=document.getElementById("userSecret").innerHTML;
+    var matchId=document.getElementsByTagName("title")[0].innerHTML;
+    var body=document.getElementsByTagName("body")[0];
+    matchId=matchId.replace("Match ","");
+    if(data==userId)
+    {
+        var tossDiv=document.getElementById("tossDiv");
+        tossDiv.parentNode.removeChild(tossDiv);
+    }
+    else
+    {
+	var status=document.getElementById("status");
+	status.parentNode.removeChild(status);
+    }
+    body.innerHTML+="<br />You have Lost the Toss. Waiting for your opponent to decide";
+});
 function startSocket()
 {
     var matchList=document.getElementById("matchList");
@@ -20,13 +58,14 @@ function startSocket()
     joinObject.userSecret=userSecret;
     joinObject.matchId=matchId;
     joinObject.players=matchPlayers;
+    console.log(joinObject);
     socket.emit('join',joinObject);
     socket.on('joinError',function(data){
 	alert(data);
     });
     socket.on('joinResponse',function(team,teamId,msg){
 	var body=document.getElementsByTagName("body")[0];
-	body.innerHTML="<h2>My Playing Eleven</h2><ul id='playingEleven'>";
+	body.innerHTML="<h2>My Playing Eleven</h2><div id='userId' style='display:none;'>"+userId+"</div><div id='userSecret' style='display:none;'>"+userSecret+"</div><ul id='playingEleven'>";
 	for(var i=0;i<team.length;i++)
 	    body.innerHTML+="<li id="+teamId[i]+">"+team[i]+"</li>";
 	body.innerHTML+="</ul><br /><h3>"+msg+"</h3>";
@@ -39,37 +78,32 @@ function startSocket()
 	for(var i=0;i<opTeam.length;i++)
 	    body.innerHTML+="<li id="+opTeamId[i]+">"+opTeam[i]+"</li>";
 	body.innerHTML+="</ul>";
-	body.innerHTML+="<h3>Decide Toss</h3><div id='buttons'>";
-	body.innerHTML+="<button id='heads' onclick=\"toss(this.id)\">Heads</button>&nbsp;&nbsp;<button id=`tails` onclick=\"toss(this.id)\">Tails</button></div>"
+	body.innerHTML+="<h3 id='tossDiv'>Decide Toss</h3><div id='buttons'><button id='heads' onclick=\"toss(this.id)\">Heads</button>&nbsp;&nbsp;<button id=`tails` onclick=\"toss(this.id)\">Tails</button></div>"
     });
     socket.on('2JoinResponse',function(team,teamId,opTeam,opTeamId,msg){
 	var body=document.getElementsByTagName("body")[0];
-	body.innerHTML="<h2>My Playing Eleven</h2><ul id='playingEleven'>";
+	body.innerHTML="<h2>My Playing Eleven</h2><div id='userId' style='display:none;'>"+userId+"</div><div id='userSecret' style='display:none;'>"+userSecret+"</div><ul id='playingEleven'>";
 	for(var i=0;i<team.length;i++)
 	    body.innerHTML+="<li id="+teamId[i]+">"+team[i]+"</li>";
 	body.innerHTML+="</ul><br /><h2>Opponent Eleven</h2><ul id='opponentEleven'>";
 	for(var j=0;j<opTeam.length;j++)
 	    body.innerHTML+="<li id="+opTeamId[j]+">"+opTeam[j]+"</li>";
-	body.innerHTML+="</ul><br /><h3>"+msg+"</h3>"
+	body.innerHTML+="</ul><br /><h3 id='status'>"+msg+"</h3>"
     });
 }
 function toss(choice)
 {
-    var buttonDiv=document.getElementById("buttons");
-    buttonDiv.parentNode.removeChild(buttonDiv);
-    var chArray=new Array();
-    chArray['heads']=1;
-    chArray['tails']=2;
     var userId=document.getElementById("userId").innerHTML;
     var userSecret=document.getElementById("userSecret").innerHTML;
     var matchId=document.getElementsByTagName("title")[0].innerHTML;
+    matchId=matchId.replace("Match ","");
+    var buttons=document.getElementById("buttons");
+    buttons.parentNode.removeChild(buttons);
     var tossObject=new Object();
     tossObject.userId=userId;
     tossObject.matchId=matchId;
     tossObject.userSecret=userSecret;
-    tossObject.decision=chArray[choice];
     socket.emit('toss',tossObject);
-    
 }
 function removeFromTeam(id)
 {

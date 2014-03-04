@@ -44,7 +44,9 @@ else
 }
 var checkMatch=function(userId,matchId,sqlConnection,callback)
 {
-    sqlConnection.connection.query("SELECT * FROM `matches` WHERE `id`=? AND (`team_1`=? OR `team_2`=?) AND (`status`=0)",[matchId,userId,userId],function(err,results){
+    console.log(userId);
+    console.log(matchId);
+   sqlConnection.connection.query("SELECT * FROM `matches` WHERE `id`=? AND (`team_1`=? OR `team_2`=?) AND (`status`=0)",[matchId,userId,userId],function(err,results){
 	if(err)
 	{
 	    error.sqlError("SELECT","matches",err);
